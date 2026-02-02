@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feedback</title>
+<style>
+body{display:flex;justify-content:center;align-items:center;height:100vh;font-family:Arial}
+button{font-size:60px;margin:20px}
+</style>
+</head>
+<body>
+<button onclick="send('MUITO_SATISFEITO')">😄</button>
+<button onclick="send('SATISFEITO')">🙂</button>
+<button onclick="send('INSATISFEITO')">☹️</button>
+
+<script>
+function send(grau){
+ fetch('/api/feedback',{
+  method:'POST',
+  headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({grau})
+ }).then(()=>alert('Obrigado!'))
+}
+</script>
+</body>
+</html>
