@@ -1,35 +1,175 @@
 <!doctype html>
 <html lang="pt">
 <head>
-<meta charset="utf-8">
-<title>Admin</title>
-<link rel="stylesheet" href="/static/style.css">
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body>
 
-<h1>Área de Administração</h1>
+<body class="admin">
+  <div class="bg-pattern"></div>
 
-<canvas id="chart" width="400" height="200"></canvas>
+  <main class="admin-shell">
+    <header class="admin-header">
+      <div class="admin-title">
+        <h1>Área Administrativa</h1>
+        <p>Estatísticas, análise temporal, comparação e exportação.</p>
+      </div>
 
-<h2>Registos</h2>
-<table>
-  <tr>
-    <th>ID</th>
-    <th>Satisfação</th>
-    <th>Data/Hora</th>
-    <th>Dia</th>
-  </tr>
-  {% for r in rows %}
-  <tr>
-    <td>{{ r.id }}</td>
-    <td>{{ r.grau }}</td>
-    <td>{{ r.created_at }}</td>
-    <td>{{ r.weekday }}</td>
-  </tr>
-  {% endfor %}
-</table>
+      <div class="admin-actions">
+        <a class="btn ghost" href="/">Abrir kiosk</a>
+        <a class="btn" href="/admin/export">Exportar CSV</a>
+      </div>
+    </header>
 
-<script src="/static/admin.js"></script>
+    <section class="admin-cards">
+      <div class="card">
+        <div class="card-head">
+          <h2>Distribuição</h2>
+          <p>Totais e percentagens</p>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="chartPie"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Totais</h2>
+          <p>Comparação rápida por categoria</p>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="chartBar"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Últimos 7 dias</h2>
+          <p>Evolução temporal</p>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="chartLine"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Dia da semana</h2>
+          <p>Distribuição por weekday</p>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="chartWeekday"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section class="card wide">
+      <div class="card-head row">
+        <div>
+          <h2>Filtros</h2>
+          <p>Ver apenas um dia, hoje, ou comparar dois dias.</p>
+        </div>
+      </div>
+
+      <div class="filters">
+        <form class="filter-form" method="get" action="/admin">
+          <label>
+            Dia
+            <input type="date" name="day" value="{{ selected_day }}">
+          </label>
+          <div class="filter-actions">
+            <button class="btn" type="submit">Aplicar</button>
+            <a class="btn ghost" href="/admin">Limpar</a>
+            <a class="btn ghost" href="/admin?day={{ today }}">Hoje</a>
+          </div>
+        </form>
+
+        <div class="compare-box">
+          <div class="compare-title">Comparar dois dias</div>
+          <div class="compare-row">
+            <label>
+              Dia 1
+              <input type="date" id="day1">
+            </label>
+            <label>
+              Dia 2
+              <input type="date" id="day2">
+            </label>
+            <button class="btn" id="btnCompare" type="button">Comparar</button>
+          </div>
+          <div class="compare-hint">Gera um gráfico extra com Dia 1 vs Dia 2.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card wide">
+      <div class="card-head row">
+        <div>
+          <h2>Registos</h2>
+          <p>Ordenação por data (mais recente primeiro) • paginação simples.</p>
+        </div>
+        <div class="pill">
+          {% if selected_day %}
+            A ver: <b>{{ selected_day }}</b>
+          {% else %}
+            A ver: <b>Todos</b>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Grau</th>
+              <th>Data/Hora</th>
+              <th>Dia da semana</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rows %}
+              <tr>
+                <td>{{ r.id }}</td>
+                <td>{{ r.grau }}</td>
+                <td>{{ r.created_at }}</td>
+                <td>{{ r.weekday }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pagination">
+        {% for p in range(1, pages + 1) %}
+          <a class="page {% if p == page %}active{% endif %}"
+             href="?page={{ p }}{% if selected_day %}&day={{ selected_day }}{% endif %}">
+            {{ p }}
+          </a>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="card wide" id="compareCard" style="display:none;">
+      <div class="card-head">
+        <h2>Comparação de dias</h2>
+        <p id="compareLabel">Dia 1 vs Dia 2</p>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="chartCompare"></canvas>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    window.__ADMIN_CONTEXT__ = {
+      selectedDay: "{{ selected_day }}",
+      today: "{{ today }}"
+    };
+  </script>
+  <script src="/static/admin.js"></script>
 </body>
 </html>
