@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<title>Admin</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<h1>Área de Administração</h1>
+
+<canvas id="chart" width="400" height="200"></canvas>
+
+<h2>Registos</h2>
+<table>
+  <tr>
+    <th>ID</th>
+    <th>Satisfação</th>
+    <th>Data/Hora</th>
+    <th>Dia</th>
+  </tr>
+  {% for r in rows %}
+  <tr>
+    <td>{{ r.id }}</td>
+    <td>{{ r.grau }}</td>
+    <td>{{ r.created_at }}</td>
+    <td>{{ r.weekday }}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+<script src="/static/admin.js"></script>
+</body>
+</html>
