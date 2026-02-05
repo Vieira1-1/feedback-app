@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login Admin</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+
+<body class="admin">
+  <div class="bg-pattern"></div>
+
+  <main class="admin-shell" style="max-width: 520px;">
+    <header class="admin-header" style="align-items:center;">
+      <div class="admin-title">
+        <h1>Admin</h1>
+        <p>Insere a password para continuar.</p>
+      </div>
+    </header>
+
+    <section class="card">
+      <form method="post" action="/admin/login?next={{ next }}" style="display:grid; gap:12px;">
+        <label style="display:grid; gap:6px; color: rgba(255,255,255,.82); font-size: 13px;">
+          Password
+          <input
+            type="password"
+            name="password"
+            placeholder="1234"
+            autofocus
+            style="
+              padding: 12px 14px;
+              border-radius: 14px;
+              border: 1px solid rgba(255,255,255,.16);
+              background: rgba(10,14,24,.55);
+              color: rgba(255,255,255,.92);
+              outline: none;
+              font-size: 14px;
+            "
+          />
+        </label>
+
+        {% if error %}
+          <div style="padding:10px 12px; border-radius: 14px; border:1px solid rgba(255,77,109,.45); background: rgba(255,77,109,.12);">
+            {{ error }}
+          </div>
+        {% endif %}
+
+        <button class="btn" type="submit" style="width:100%;">Entrar</button>
+        <a class="btn ghost" href="/" style="width:100%; justify-content:center;">Voltar ao Kiosk</a>
+      </form>
+    </section>
+  </main>
+</body>
+</html>
