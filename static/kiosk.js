@@ -1,57 +1,114 @@
-<!doctype html>
-<html lang="pt">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Feedback</title>
-  <link rel="stylesheet" href="/static/style.css" />
-</head>
+const buttons = Array.from(document.querySelectorAll(".kiosk-btn"));
 
-<body class="kiosk">
-  <div class="bg-pattern"></div>
+const overlay = document.getElementById("overlay");
+const popupIcon = document.getElementById("popupIcon");
+const popupTitle = document.getElementById("popupTitle");
+const popupSub = document.getElementById("popupSub");
+const popupBar = document.getElementById("popupBar");
 
-  <main class="kio">
-    <header class="kiosk-header">
-      <div class="brand-dot"></div>
-      <div>
-        <h1>Como foi o atendimento?</h1>
-        <p>Toque numa opção para registar a sua experiência.</p>
-      </div>
-    </header>
+let locked = false;
+const COOLDOWN_MS = 2000;
 
-    <section class="kiosk-grid" aria-label="Escolha de satisfação">
-      <button class="kiosk-btn very-happy" data-grau="MUITO_SATISFEITO" aria-label="Muito satisfeito">
-        <span class="emoji">😄</span>
-        <span class="label">Muito satisfeito</span>
-      </button>
+function setLocked(state){
+  locked = state;
+  buttons.forEach(b => {
+    b.disabled = state;
+    b.classList.toggle("is-locked", state);
+  });
+}
 
-      <button class="kiosk-btn happy" data-grau="SATISFEITO" aria-label="Satisfeito">
-        <span class="emoji">🙂</span>
-        <span class="label">Satisfeito</span>
-      </button>
+function showPopup(ok, message){
+  overlay.classList.add("show");
+  overlay.setAttribute("aria-hidden", "false");
 
-      <button class="kiosk-btn sad" data-grau="INSATISFEITO" aria-label="Insatisfeito">
-        <span class="emoji">☹️</span>
-        <span class="label">Insatisfeito</span>
-      </button>
-    </section>
+  if (ok){
+    popupIcon.textContent = "✅";
+    popupTitle.textContent = "Obrigado!";
+    popupSub.textContent = "Feedback registado.";
+  } else {
+    popupIcon.textContent = "⚠️";
+    popupTitle.textContent = "Erro";
+    popupSub.textContent = message || "Não foi possível registar.";
+  }
 
-    <footer class="kiosk-footer">
-      <span class="hint">Modo kiosk • ecrã completo • ideal para tablet</span>
-      <a class="admin-link" href="/admin">Admin</a>
-    </footer>
-  </main>
+  // reinicia barra
+  popupBar.style.transition = "none";
+  popupBar.style.transform = "scaleX(0)";
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      popupBar.style.transition = `transform ${COOLDOWN_MS}ms linear`;
+      popupBar.style.transform = "scaleX(1)";
+    });
+  });
+}
 
-  <div id="toast" class="toast" aria-live="polite">
-    <div class="toast-inner">
-      <div class="toast-icon">✅</div>
-      <div>
-        <div class="toast-title">Obrigado!</div>
-        <div class="toast-sub">O seu feedback foi registado.</div>
-      </div>
-    </div>
-  </div>
+function hidePopup(){
+  overlay.classList.remove("show");
+  overlay.setAttribute("aria-hidden", "true");
+}
 
-  <script src="/static/kiosk.js"></script>
-</body>
-</html>
+// ripple (efeito ondulação)
+function addRipple(btn, clientX, clientY){
+  const rect = btn.getBoundingClientRect();
+  const x = clientX - rect.left;
+  const y = clientY - rect.top;
+
+  const ripple = document.createElement("span");
+  ripple.className = "ripple";
+  ripple.style.left = `${x}px`;
+  ripple.style.top = `${y}px`;
+
+  btn.appendChild(ripple);
+
+  ripple.addEventListener("animationend", () => ripple.remove());
+}
+
+async function sendFeedback(grau, btn, ev){
+  if (locked) return;
+
+  // ripple onde clicou
+  if (ev && ev.clientX && ev.clientY) addRipple(btn, ev.clientX, ev.clientY);
+
+  // animação de seleção
+  buttons.forEach(b => b.classList.remove("is-selected", "is-error"));
+  btn.classList.add("is-selected");
+
+  // bloqueio imediato
+  setLocked(true);
+
+  // popup imediato (UX)
+  showPopup(true);
+
+  let ok = true;
+  let msg = "";
+
+  try{
+    const res = await fetch("/api/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ grau })
+    });
+
+    const data = await res.json().catch(() => ({}));
+    ok = res.ok && data.ok !== false;
+    msg = data.message || "";
+  }catch(e){
+    ok = false;
+    msg = "Sem ligação ao servidor.";
+  }
+
+  if (!ok){
+    btn.classList.add("is-error");
+    showPopup(false, msg);
+  }
+
+  setTimeout(() => {
+    hidePopup();
+    buttons.forEach(b => b.classList.remove("is-selected", "is-error"));
+    setLocked(false);
+  }, COOLDOWN_MS);
+}
+
+buttons.forEach(btn => {
+  btn.addEventListener("click", (ev) => sendFeedback(btn.dataset.grau, btn, ev));
+});
