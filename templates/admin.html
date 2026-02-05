@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Admin</title>
+
   <link rel="stylesheet" href="/static/style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -12,6 +13,7 @@
   <div class="bg-pattern"></div>
 
   <main class="admin-shell">
+
     <header class="admin-header">
       <div class="admin-title">
         <h1>Área Administrativa</h1>
@@ -19,58 +21,71 @@
       </div>
 
       <div class="admin-actions">
-        <a class="btn ghost" href="/">Abrir kiosk</a>
-        <a class="btn" href="/admin/export">Exportar CSV</a>
+        <a class="btn ghost" href="/">Kiosk</a>
+
+        <!-- Exportações (respeitam filtro day se estiver selecionado) -->
+        <a class="btn" href="/admin/export.csv{% if selected_day %}?day={{ selected_day }}{% endif %}">Exportar CSV</a>
+        <a class="btn" href="/admin/export.txt{% if selected_day %}?day={{ selected_day }}{% endif %}">Exportar TXT</a>
+
+        <a class="btn ghost" href="/admin/logout">Logout</a>
       </div>
     </header>
 
     <section class="admin-cards">
-      <div class="card">
+      <article class="card">
         <div class="card-head">
-          <h2>Distribuição</h2>
-          <p>Totais e percentagens</p>
+          <div>
+            <h2>Distribuição</h2>
+            <p>Percentagens por tipo</p>
+          </div>
         </div>
         <div class="chart-wrap">
           <canvas id="chartPie"></canvas>
         </div>
-      </div>
+      </article>
 
-      <div class="card">
+      <article class="card">
         <div class="card-head">
-          <h2>Totais</h2>
-          <p>Comparação rápida por categoria</p>
+          <div>
+            <h2>Totais</h2>
+            <p>Número de registos</p>
+          </div>
         </div>
         <div class="chart-wrap">
           <canvas id="chartBar"></canvas>
         </div>
-      </div>
+      </article>
 
-      <div class="card">
+      <article class="card">
         <div class="card-head">
-          <h2>Últimos 7 dias</h2>
-          <p>Evolução temporal</p>
+          <div>
+            <h2>Últimos 7 dias</h2>
+            <p>Evolução temporal</p>
+          </div>
         </div>
         <div class="chart-wrap">
           <canvas id="chartLine"></canvas>
         </div>
-      </div>
+      </article>
 
-      <div class="card">
+      <article class="card">
         <div class="card-head">
-          <h2>Dia da semana</h2>
-          <p>Distribuição por weekday</p>
+          <div>
+            <h2>Dia da semana</h2>
+            <p>Distribuição semanal</p>
+          </div>
         </div>
         <div class="chart-wrap">
           <canvas id="chartWeekday"></canvas>
         </div>
-      </div>
+      </article>
     </section>
 
     <section class="card wide">
-      <div class="card-head row">
+      <div class="card-head">
         <div>
-          <h2>Filtros</h2>
-          <p>Ver apenas um dia, hoje, ou comparar dois dias.</p>
+          <h2>Filtros e comparação</h2>
+          <p>Filtrar por dia, ver só hoje, ou comparar dois dias.</p>
         </div>
       </div>
 
@@ -80,6 +95,7 @@
             Dia
             <input type="date" name="day" value="{{ selected_day }}">
           </label>
+
           <div class="filter-actions">
             <button class="btn" type="submit">Aplicar</button>
             <a class="btn ghost" href="/admin">Limpar</a>
@@ -89,34 +105,33 @@
 
         <div class="compare-box">
           <div class="compare-title">Comparar dois dias</div>
+
           <div class="compare-row">
             <label>
               Dia 1
               <input type="date" id="day1">
             </label>
+
             <label>
               Dia 2
               <input type="date" id="day2">
             </label>
+
             <button class="btn" id="btnCompare" type="button">Comparar</button>
           </div>
-          <div class="compare-hint">Gera um gráfico extra com Dia 1 vs Dia 2.</div>
+
+          <div class="compare-hint">
+            Isto mostra um gráfico extra com Dia 1 vs Dia 2.
+          </div>
         </div>
       </div>
     </section>
 
     <section class="card wide">
-      <div class="card-head row">
+      <div class="card-head">
         <div>
           <h2>Registos</h2>
-          <p>Ordenação por data (mais recente primeiro) • paginação simples.</p>
-        </div>
-        <div class="pill">
-          {% if selected_day %}
-            A ver: <b>{{ selected_day }}</b>
-          {% else %}
-            A ver: <b>Todos</b>
-          {% endif %}
+          <p>Ordenado por data (mais recente primeiro) • paginação.</p>
         </div>
       </div>
 
@@ -155,13 +170,16 @@
 
     <section class="card wide" id="compareCard" style="display:none;">
       <div class="card-head">
-        <h2>Comparação de dias</h2>
-        <p id="compareLabel">Dia 1 vs Dia 2</p>
+        <div>
+          <h2>Comparação</h2>
+          <p id="compareLabel">Dia 1 vs Dia 2</p>
+        </div>
       </div>
       <div class="chart-wrap">
         <canvas id="chartCompare"></canvas>
       </div>
     </section>
+
   </main>
 
   <script>
@@ -170,6 +188,7 @@
       today: "{{ today }}"
     };
   </script>
+
   <script src="/static/admin.js"></script>
 </body>
 </html>
