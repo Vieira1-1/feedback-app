@@ -1,9 +1,15 @@
 import os
 import sqlite3
 from datetime import datetime, date
-from flask import Flask, request, jsonify, render_template, g, Response
+from flask import (
+    Flask, request, jsonify, render_template, g,
+    Response, session, redirect, url_for
+)
 
 app = Flask(__name__)
+
+app.secret_key = os.environ.get("SECRET_KEY", "troca-isto-para-um-segredo-melhor")
+ADMIN_PASSWORD = "1234"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -53,6 +59,15 @@ def normalize_grau(grau: str) -> str:
     return grau if grau in valid else ""
 
 
+# ---------------- Auth helpers ----------------
+
+def require_admin():
+    if not session.get("admin_logged"):
+        next_url = request.full_path if request.query_string else request.path
+        return redirect(url_for("admin_login", next=next_url))
+    return None
+
+
 # ---------------- Pages ----------------
 
 @app.route("/")
@@ -60,27 +75,51 @@ def kiosk():
     return render_template("kiosk.html")
 
 
+@app.route("/admin/login", methods=["GET", "POST"])
+def admin_login():
+    next_url = request.args.get("next") or "/admin"
+
+    if request.method == "POST":
+        password = (request.form.get("password") or "").strip()
+        if password == ADMIN_PASSWORD:
+            session["admin_logged"] = True
+            return redirect(next_url)
+        return render_template("admin_login.html", error="Password incorreta.", next=next_url)
+
+    return render_template("admin_login.html", error="", next=next_url)
+
+
+@app.route("/admin/logout")
+def admin_logout():
+    session.clear()
+    return redirect("/admin/login")
+
+
 @app.route("/admin")
 def admin():
-    # filtros (tabela)
+    gate = require_admin()
+    if gate:
+        return gate
+
     selected_day = request.args.get("day") or ""
     today = iso_today()
 
-    # paginação
-    page = int(request.args.get("page", 1))
+    try:
+        page = int(request.args.get("page", 1))
+    except ValueError:
+        page = 1
     page = max(page, 1)
+
     per_page = 10
     offset = (page - 1) * per_page
 
     where = ""
     params = []
-
     if selected_day:
         where = "WHERE substr(created_at, 1, 10)=?"
         params.append(selected_day)
 
     db = get_db()
-
     rows = db.execute(
         f"SELECT * FROM feedback {where} "
         "ORDER BY created_at DESC LIMIT ? OFFSET ?",
@@ -108,15 +147,17 @@ def admin():
 
 @app.route("/api/feedback", methods=["POST"])
 def api_feedback():
-    data = request.get_json(silent=True) or {}
-    grau = normalize_grau(data.get("grau", ""))
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(ok=False, message="JSON inválido."), 400
 
+    grau = normalize_grau(data.get("grau", ""))
     if not grau:
         return jsonify(ok=False, message="Grau inválido."), 400
 
     now = datetime.now()
     created_at = now.isoformat(timespec="seconds")
-    weekday = now.strftime("%A")  # Monday, Tuesday... (podes traduzir no front)
+    weekday = now.strftime("%A")
 
     db = get_db()
     db.execute(
@@ -132,17 +173,10 @@ def api_feedback():
 
 @app.route("/api/stats")
 def api_stats():
-    """
-    Retorna:
-    - totals: contagens por grau (geral ou por dia)
-    - percents: percentagens por grau
-    - by_weekday: contagens por weekday (geral ou por dia)
-    - last7: total por dia (últimos 7 dias)
-    - compare: comparação entre dois dias (opcional)
-    Query params:
-      day=YYYY-MM-DD (filtra tudo para esse dia)
-      day1=YYYY-MM-DD&day2=YYYY-MM-DD (comparação)
-    """
+    gate = require_admin()
+    if gate:
+        return jsonify(ok=False, message="Não autorizado."), 401
+
     day = request.args.get("day") or ""
     day1 = request.args.get("day1") or ""
     day2 = request.args.get("day2") or ""
@@ -164,13 +198,13 @@ def api_stats():
         totals = {r["grau"]: int(r["total"]) for r in rows}
         total_all = sum(totals.values())
 
-        # garantir keys sempre presentes (para os gráficos não “saltarem”)
         for k in ["MUITO_SATISFEITO", "SATISFEITO", "INSATISFEITO"]:
             totals.setdefault(k, 0)
 
-        percents = {}
-        for k, v in totals.items():
-            percents[k] = round((v / total_all) * 100, 1) if total_all else 0.0
+        percents = {
+            k: (round((v / total_all) * 100, 1) if total_all else 0.0)
+            for k, v in totals.items()
+        }
 
         by_weekday_rows = db.execute(
             f"SELECT weekday, COUNT(*) AS total FROM feedback {where} GROUP BY weekday",
@@ -182,7 +216,6 @@ def api_stats():
 
     totals, percents, by_weekday = totals_for(day)
 
-    # últimos 7 dias (sempre global)
     last7_rows = db.execute("""
         SELECT substr(created_at, 1, 10) AS day, COUNT(*) AS total
         FROM feedback
@@ -216,22 +249,74 @@ def api_stats():
     )
 
 
-# ---------------- Export CSV ----------------
+# ---------------- Export CSV + TXT (com filtro por dia) ----------------
 
-@app.route("/admin/export")
-def export_csv():
+def _export_rows(day_filter: str):
+    """Devolve rows do DB (filtradas por dia se existir)."""
     db = get_db()
-    rows = db.execute("SELECT * FROM feedback ORDER BY created_at DESC").fetchall()
+    where = ""
+    params = []
+    if day_filter:
+        where = "WHERE substr(created_at, 1, 10)=?"
+        params.append(day_filter)
+
+    rows = db.execute(
+        f"SELECT * FROM feedback {where} ORDER BY created_at DESC",
+        params
+    ).fetchall()
+
+    return rows
+
+
+@app.route("/admin/export.csv")
+def export_csv():
+    gate = require_admin()
+    if gate:
+        return gate
+
+    day = request.args.get("day") or ""
+    rows = _export_rows(day)
 
     def generate():
         yield "id,grau,created_at,weekday\n"
         for r in rows:
             yield f'{r["id"]},{r["grau"]},{r["created_at"]},{r["weekday"]}\n'
 
+    filename = f'feedback{"_"+day if day else ""}.csv'
+
     return Response(
         generate(),
         mimetype="text/csv",
-        headers={"Content-Disposition": "attachment; filename=feedback.csv"}
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+@app.route("/admin/export.txt")
+def export_txt():
+    gate = require_admin()
+    if gate:
+        return gate
+
+    day = request.args.get("day") or ""
+    rows = _export_rows(day)
+
+    def generate():
+        yield "RELATÓRIO DE FEEDBACK\n"
+        yield "====================\n"
+        if day:
+            yield f"Filtro (dia): {day}\n"
+        yield f"Total de registos: {len(rows)}\n\n"
+
+        # formato legível
+        for r in rows:
+            yield f'#{r["id"]} | {r["grau"]} | {r["created_at"]} | {r["weekday"]}\n'
+
+    filename = f'feedback{"_"+day if day else ""}.txt'
+
+    return Response(
+        generate(),
+        mimetype="text/plain",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
 
 
